@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <h1>Личный кабинет</h1>
+    <div id="user-info"></div>
+    <button id="logout">Выйти</button>
+</div>
+
+<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('jwt');
+
+            if (!token) {
+                window.location.href = '/index.html';
+                return;
+            }
+
+            // Запрос к защищённому эндпоинту /me
+            fetch('/me', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Ошибка аутентификации');
+                }
+                return response.text();
+            })
+            .then(text => {
+                document.getElementById('user-info').textContent = text;
+            })
+            .catch(error => {
+                console.error(error);
+                window.location.href = '/index.html';
+            });
+
+            // Выход
+            document.getElementById('logout').addEventListener('click', function() {
+                localStorage.removeItem('jwt');
+                window.location.href = '/index.html';
+            });
+        });
+    </script>
+</body>
+</html>

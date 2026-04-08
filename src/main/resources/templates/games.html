@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Подбор игр</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            background-image: url([[@{/images/rename.jpg}]]);
+              background-size: cover;
+              background-position: center;
+              background-repeat: no-repeat;
+              background-attachment: fixed; /* Фиксирует фон при прокрутке (опционально) */
+              min-height: 100vh; /* Занимает всю высоту экрана */
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        .game-card {
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            height: 100%;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+        }
+        .game-header-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-bottom: 1px solid #eee;
+        }
+        #search-container {
+            position: relative;
+        }
+        #suggestions {
+            position: absolute;
+            width: 100%;
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .genre-badge {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        .selected-game-badge {
+            background-color: #4a6baf;
+        }
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+        }
+        /* Новые стили для навигации */
+        .nav-icon {
+            font-size: 1.5rem;
+            margin: 0 10px;
+            color: #4a6baf;
+            transition: all 0.3s;
+        }
+        .nav-icon:hover {
+            color: #2c4a8a;
+            transform: scale(1.1);
+        }
+        .nav-container {
+            display: flex;
+            justify-content: flex-end;
+            padding: 15px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Добавленная навигация -->
+    <div class="nav-container">
+        <a href="/movies" class="nav-icon" title="Фильмы">
+            <i class="bi bi-film"></i>
+        </a>
+        <a href="/profile" class="nav-icon" title="Профиль">
+            <i class="bi bi-person-circle"></i>
+        </a>
+    </div>
+
+    <h1 class="mb-4 text-center">Подбор видеоигр</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <div id="search-container">
+                <input type="text" id="search-input" class="form-control form-control-lg"
+                       placeholder="Начните вводить название игры...">
+                <div id="suggestions" class="list-group d-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4>Выбранные игры:</h4>
+            <div id="selected-games" class="d-flex flex-wrap gap-2 mb-3"></div>
+            <button id="recommend-btn" class="btn btn-success btn-lg" disabled>
+                <i class="bi bi-magic"></i> Подобрать рекомендации
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div id="results" class="row row-cols-1 row-cols-md-3 g-4"></div>
+    </div>
+</div>
+
+<div id="loading-spinner" class="loading-spinner">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const token = localStorage.getItem('jwt');
+    if (!token) {
+        window.location.href = '/';
+    }
+
+    const searchInput = document.getElementById('search-input');
+    const suggestions = document.getElementById('suggestions');
+    const selectedGamesContainer = document.getElementById('selected-games');
+    const recommendBtn = document.getElementById('recommend-btn');
+    const resultsContainer = document.getElementById('results');
+    const loadingSpinner = document.getElementById('loading-spinner');
+
+    let selectedGames = [];
+    let searchTimeout = null;
+
+    // Поиск игр при вводе
+    searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim();
+
+        if (query.length < 2) {
+            suggestions.classList.add('d-none');
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/games/search?query=${encodeURIComponent(query)}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+            )
+                .then(response => response.json())
+                .then(games => {
+                    if (games.length > 0) {
+                        showSuggestions(games);
+                    } else {
+                        suggestions.classList.add('d-none');
+                    }
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    suggestions.classList.add('d-none');
+                });
+        }, 300);
+    });
+
+    // Показ подсказок
+    function showSuggestions(games) {
+        suggestions.innerHTML = '';
+        suggestions.classList.remove('d-none');
+
+        games.forEach(game => {
+            if (selectedGames.some(g => g.id === game.id)) return;
+
+            const item = document.createElement('a');
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${game.name}</strong>
+                        ${game.releaseDate ? `<span class="text-muted ms-2">${game.releaseDate.substring(0, 4)}</span>` : ''}
+                    </div>
+                    ${game.headerImage ? `<img src="${game.headerImage}" style="height: 30px; width: auto;">` : ''}
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                addSelectedGame(game);
+                searchInput.value = '';
+                suggestions.classList.add('d-none');
+            });
+
+            suggestions.appendChild(item);
+        });
+    }
+
+    // Добавление выбранной игры
+    function addSelectedGame(game) {
+        if (selectedGames.some(g => g.id === game.id)) return;
+
+        selectedGames.push(game);
+        updateSelectedGamesList();
+        recommendBtn.disabled = selectedGames.length === 0;
+    }
+
+    // Обновление списка выбранных игр
+    function updateSelectedGamesList() {
+        selectedGamesContainer.innerHTML = '';
+
+        selectedGames.forEach(game => {
+            const badge = document.createElement('div');
+            badge.className = 'badge selected-game-badge text-white p-2 d-flex align-items-center';
+            badge.innerHTML = `
+                ${game.headerImage ? `<img src="${game.headerImage}" style="height: 20px; width: auto; margin-right: 5px;">` : ''}
+                ${game.name}
+                <button type="button" class="btn-close btn-close-white ms-2" aria-label="Удалить"></button>
+            `;
+
+            badge.querySelector('.btn-close').addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectedGames = selectedGames.filter(g => g.id !== game.id);
+                updateSelectedGamesList();
+                recommendBtn.disabled = selectedGames.length === 0;
+            });
+
+            selectedGamesContainer.appendChild(badge);
+        });
+    }
+
+    // Получение рекомендаций
+    recommendBtn.addEventListener('click', function() {
+        loadingSpinner.style.display = 'block';
+        resultsContainer.innerHTML = '';
+
+        const gameIds = selectedGames.map(game => game.id);
+        fetch(`/api/games/recommendations/for-user?playedGames=${gameIds.join(',')}&limit=6`,
+        {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const games = Array.isArray(data) ? data : [];
+                showRecommendations(games);
+            })
+            .catch(error => {
+                console.error('Recommendation error:', error);
+                resultsContainer.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger">Ошибка при получении рекомендаций: ${error.message}</div>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                loadingSpinner.style.display = 'none';
+            });
+    });
+
+    // Отображение результатов
+    function showRecommendations(games) {
+        resultsContainer.innerHTML = '';
+
+        if (!Array.isArray(games) || games.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-info">Не найдено рекомендаций. Попробуйте выбрать другие игры.</div>
+                </div>
+            `;
+            return;
+        }
+
+        games.forEach(game => {
+            if (!game || typeof game !== 'object') return;
+
+            const card = document.createElement('div');
+            card.className = 'col';
+            card.innerHTML = `
+                <div class="game-card card h-100">
+                    <img src="${game.header_image}"
+                         class="card-img-top game-header-image" alt="${game.name || 'Игра'}">
+                    <div class="card-body">
+                        <h5 class="card-title">${game.name || 'Без названия'}</h5>
+                        <div class="d-flex justify-content-between mb-2">
+                            ${game.releaseDate ? `<small class="text-muted">${String(game.releaseDate).substring(0, 4)}</small>` : ''}
+                            ${game.developer ? `<small class="text-muted">${game.developer}</small>` : ''}
+                        </div>
+                        <div class="mb-2">
+                            ${game.genres && Array.isArray(game.genres) ?
+                              game.genres.map(g => `<span class="badge bg-secondary genre-badge">${g}</span>`).join('') : ''}
+                        </div>
+                        ${game.description ? `<p class="card-text">${String(game.description).substring(0, 100)}...</p>` : ''}
+                    </div>
+                    <div class="card-footer bg-white d-flex justify-content-between">
+                        ${game.rating ? `<small class="text-success">★ ${Number(game.rating).toFixed(1)}/10</small>` : ''}
+                        ${game.release_date ? `<small class="text-muted">${String(game.release_date).substring(0, 4)}</small>` : '<small class="text-muted">Неизвестно</small>'}
+                        <button class="btn btn-sm btn-outline-secondary mark-watched"
+                                data-type="game"
+                                data-id="${game.id}"
+                                title="Отметить как просмотренное">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            resultsContainer.appendChild(card);
+        });
+    }
+
+    // Скрытие подсказок при клике вне поля
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput) {
+            suggestions.classList.add('d-none');
+        }
+    });
+</script>
+</body>
+</html>

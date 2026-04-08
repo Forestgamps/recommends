@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendation System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <h1>Подбор развлекательного контента</h1>
+
+    <div class="auth-forms">
+        <!-- Форма регистрации -->
+        <div class="form-container" id="register-form">
+            <h2>Регистрация</h2>
+            <form id="register">
+                <input type="text" id="reg-username" placeholder="Имя пользователя" required>
+                <input type="password" id="reg-password" placeholder="Пароль" required>
+                <button type="submit">Зарегистрироваться</button>
+            </form>
+            <p>Уже есть аккаунт? <a href="#" id="show-login">Войти</a></p>
+        </div>
+
+        <!-- Форма входа -->
+        <div class="form-container hidden" id="login-form">
+            <h2>Вход</h2>
+            <form id="login">
+                <input type="text" id="login-username" placeholder="Имя пользователя" required>
+                <input type="password" id="login-password" placeholder="Пароль" required>
+                <button type="submit">Войти</button>
+            </form>
+            <p>Нет аккаунта? <a href="#" id="show-register">Зарегистрироваться</a></p>
+        </div>
+    </div>
+
+    <div id="auth-result"></div>
+</div>
+
+<script src="auth.js"></script>
+</body>
+</html>

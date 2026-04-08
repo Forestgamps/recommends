@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Личный кабинет</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            background-image: url(/images/rename.jpg);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        .history-item {
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .history-item:hover {
+            transform: translateY(-5px);
+        }
+        .nav-icon {
+            font-size: 1.5rem;
+            margin: 0 10px;
+            color: #4a6baf;
+            transition: all 0.3s;
+        }
+        .nav-icon:hover {
+            color: #2c4a8a;
+            transform: scale(1.1);
+        }
+        .nav-container {
+            display: flex;
+            justify-content: flex-end;
+            padding: 15px 0;
+        }
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+        }
+        .game-card {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        #add-movie-form .row, #add-game-form .row {
+            margin-bottom: 15px;
+        }
+
+        .tab-content {
+            padding: 20px 0;
+        }
+
+        .form-label {
+            font-weight: 500;
+        }
+
+        .required-star::after {
+            content: " *";
+            color: red;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Навигационная панель -->
+    <div class="nav-container">
+        <a href="/movies" class="nav-icon" title="Фильмы">
+            <i class="bi bi-film"></i>
+        </a>
+        <a href="/games" class="nav-icon" title="Игры">
+            <i class="bi bi-joystick"></i>
+        </a>
+        <a href="#" id="logout-btn" class="nav-icon" title="Выход">
+            <i class="bi bi-box-arrow-right"></i>
+        </a>
+        <a href="#" id="add-content-btn" class="nav-icon" title="Управление контентом">
+            <i class="bi bi-gear"></i>
+        </a>
+    </div>
+
+    <h1 class="mb-4 text-center">Личный кабинет</h1>
+
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h3 id="username-display"></h3>
+        </div>
+    </div>
+
+
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h4>История подборов:</h4>
+            <button id="clear-history-btn" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Очистить историю
+            </button>
+        </div>
+        <div id="history-container" class="row row-cols-1 row-cols-md-3 g-4"></div>
+    </div>
+</div>
+
+<div id="loading-spinner" class="loading-spinner">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">Загрузка...</span>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления контента -->
+<div class="modal fade" id="addContentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новый контент</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="contentTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="movie-tab" data-bs-toggle="tab" data-bs-target="#movie-form" type="button">Фильм</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="game-tab" data-bs-toggle="tab" data-bs-target="#game-form" type="button">Игра</button>
+                    </li>
+
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="delete-movie-tab" data-bs-toggle="tab" data-bs-target="#delete-movie" type="button">Удалить фильм</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="delete-game-tab" data-bs-toggle="tab" data-bs-target="#delete-game" type="button">Удалить игру</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="contentTabContent">
+                    <!-- Форма для фильма -->
+                    <!-- Форма для фильма -->
+                    <div class="tab-pane fade show active" id="movie-form">
+                        <form id="add-movie-form" class="mt-3">
+                            <div class="mb-3">
+                                <label class="form-label required-star">Название</label>
+                                <input type="text" class="form-control" name="title" required>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Оригинальное название</label>
+                                    <input type="text" class="form-control" name="originalTitle">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Язык оригинала</label>
+                                    <input type="text" class="form-control" name="originalLanguage">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Описание</label>
+                                <textarea class="form-control" name="overview" rows="3"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Слоган</label>
+                                <input type="text" class="form-control" name="tagline">
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Дата выхода</label>
+                                    <input type="date" class="form-control" name="releaseDate">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Популярность</label>
+                                    <input type="number" step="0.01" class="form-control" name="popularity">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Статус</label>
+                                    <select class="form-select" name="status">
+                                        <option value="">Выберите статус</option>
+                                        <option value="Released">Выпущен</option>
+                                        <option value="Post Production">Пост-продакшн</option>
+                                        <option value="In Production">В производстве</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Бюджет ($)</label>
+                                    <input type="number" class="form-control" name="budget">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Сборы ($)</label>
+                                    <input type="number" class="form-control" name="revenue">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Продолжительность (мин)</label>
+                                    <input type="number" class="form-control" name="runtime">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Рейтинг</label>
+                                    <input type="number" step="0.1" min="0" max="10" class="form-control" name="voteAverage">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Кол-во оценок</label>
+                                    <input type="number" class="form-control" name="voteCount">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Домашняя страница</label>
+                                <input type="url" class="form-control" name="homepage">
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Форма для игры -->
+                    <div class="tab-pane fade" id="game-form">
+                        <form id="add-game-form" class="mt-3">
+                            <div class="mb-3">
+                                <label class="form-label required-star">Название</label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Дата выхода</label>
+                                    <input type="date" class="form-control" name="releaseDate">
+                                </div>
+<!--                                <div class="col-md-6">-->
+<!--                                    <label class="form-label">Поддержка английского</label>-->
+<!--                                    <select class="form-select" name="english">-->
+<!--                                        <option value="true">Да</option>-->
+<!--                                        <option value="false">Нет</option>-->
+<!--                                    </select>-->
+<!--                                </div>-->
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Разработчик</label>
+                                    <input type="text" class="form-control" name="developer">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Продано копий</label>
+                                    <input type="text" class="form-control" name="publisher">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+<!--                                <div class="col-md-4">-->
+<!--                                    <label class="form-label">Возрастное ограничение</label>-->
+<!--                                    <input type="number" class="form-control" name="requiredAge" min="0" max="21">-->
+<!--                                </div>-->
+<!--                                <div class="col-md-4">-->
+<!--                                    <label class="form-label">Достижения</label>-->
+<!--                                    <input type="number" class="form-control" name="achievements">-->
+<!--                                </div>-->
+                                <div class="col-md-4">
+                                    <label class="form-label">Цена ($)</label>
+                                    <input type="number" step="0.01" class="form-control" name="price">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Положительные оценки</label>
+                                    <input type="number" class="form-control" name="positiveRatings">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Отрицательные оценки</label>
+                                    <input type="number" class="form-control" name="negativeRatings">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Среднее время игры (мин)</label>
+                                    <input type="number" class="form-control" name="averagePlaytime">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Медиана времени игры (мин)</label>
+                                    <input type="number" class="form-control" name="medianPlaytime">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Владельцы (диапазон)</label>
+                                <input type="text" class="form-control" name="owners" placeholder="пример: 10000-20000">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Платформы (через запятую)</label>
+                                <input type="text" class="form-control" name="platforms" placeholder="пример: Windows, macOS, Linux">
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Категории (через запятую)</label>
+                                    <input type="text" class="form-control" name="categories">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Жанры (через запятую)</label>
+                                    <input type="text" class="form-control" name="genres">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Теги (через запятую)</label>
+                                <input type="text" class="form-control" name="tags">
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="delete-movie">
+                    <div class="mt-3">
+                        <div class="mb-3">
+                            <label class="form-label">ID фильма для удаления</label>
+                            <input type="number" class="form-control" id="delete-movie-id">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Название для подтверждения</label>
+                            <input type="text" class="form-control" id="delete-movie-title">
+                        </div>
+                        <button id="confirm-delete-movie" class="btn btn-danger">Подтвердить удаление</button>
+
+                        <div class="mt-4">
+                            <h6>Быстрый поиск фильма</h6>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="search-movie" placeholder="Поиск по названию">
+                                <button class="btn btn-outline-secondary" type="button" id="search-movie-btn">Найти</button>
+                            </div>
+                            <div id="movie-search-results" class="list-group"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Форма удаления игры -->
+                <div class="tab-pane fade" id="delete-game">
+                    <div class="mt-3">
+                        <div class="mb-3">
+                            <label class="form-label">ID игры для удаления</label>
+                            <input type="number" class="form-control" id="delete-game-id">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Название для подтверждения</label>
+                            <input type="text" class="form-control" id="delete-game-title">
+                        </div>
+                        <button id="confirm-delete-game" class="btn btn-danger">Подтвердить удаление</button>
+
+                        <div class="mt-4">
+                            <h6>Быстрый поиск игры</h6>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="search-game" placeholder="Поиск по названию">
+                                <button class="btn btn-outline-secondary" type="button" id="search-game-btn">Найти</button>
+                            </div>
+                            <div id="game-search-results" class="list-group"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="submit-movie-btn">Добавить фильм</button>
+                <button type="button" class="btn btn-primary" id="submit-game-btn">Добавить игру</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const token = localStorage.getItem('jwt');
+    console.log("JWT Payload:", parseJwt(token));
+    if (!token) {
+        window.location.href = '/';
+    }
+
+    const usernameDisplay = document.getElementById('username-display');
+    const historyContainer = document.getElementById('history-container');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    // Получаем данные пользователя и историю
+    document.addEventListener('DOMContentLoaded', function() {
+        loadUserProfile();
+    });
+
+    // Загрузка профиля пользователя
+    function loadUserProfile() {
+        loadingSpinner.style.display = 'block';
+
+        // Получаем имя пользователя из токена
+        const username = parseJwt(token).sub;
+        usernameDisplay.textContent = `Добро пожаловать, ${username}!`;
+
+        // Загружаем историю запросов
+        fetch('/api/history', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.status === 403) {
+                throw new Error('Доступ запрещен. Пожалуйста, войдите снова');
+            }
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки истории');
+            }
+            return response.json();
+        })
+        .then(history => {
+            console.log("Received history data:", history);
+            renderHistory(history);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            historyContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">Ошибка при загрузке истории: ${error.message}</div>
+                </div>
+            `;
+        })
+        .finally(() => {
+            loadingSpinner.style.display = 'none';
+        });
+    }
+
+    // Отображение истории запросов
+    function renderHistory(history) {
+        historyContainer.innerHTML = '';
+        clearHistoryBtn.style.display = history.length > 0 ? 'block' : 'none';
+
+        if (!Array.isArray(history) || history.length === 0) {
+            historyContainer.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-info">История запросов пуста</div>
+                </div>
+            `;
+            return;
+        }
+
+        history.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'col';
+            card.innerHTML = `
+                <div class="history-item card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">${getRecommendationTypeTitle(item.recommendationType)}</h5>
+                        <small class="text-muted">${new Date(item.created_at).toLocaleString()}</small>
+                        <div class="mt-3">
+                            ${renderHistoryItems(item.content_details)}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            historyContainer.appendChild(card);
+        });
+    }
+
+    // Рендер элементов истории
+    function renderHistoryItems(items) {
+    console.log("Rendering items:", items); // Добавьте эту строку
+
+    if (!items || items.length === 0) {
+        return '<p>Нет данных о рекомендациях</p>';
+    }
+
+    return `
+        <div class="d-grid gap-2">
+            ${items.slice(0, 3).map(item => {
+                console.log("Item details:", item); // Добавьте эту строку
+                return `
+                <div class="game-card">
+                    ${item.image ?
+                        `<img src="${item.image}" class="img-fluid mb-2" style="max-height: 100px;">` :
+                        `<div class="bg-light mb-2" style="height:100px; display:flex; align-items:center; justify-content:center;">
+                            <i class="bi bi-image" style="font-size:2rem;"></i>
+                         </div>`
+                    }
+                    <h6>${item.name || 'Без названия (ID: ' + item.id + ')'}</h6>
+                </div>
+                `;
+            }).join('')}
+            ${items.length > 3 ? `<p>И еще ${items.length - 3} элементов...</p>` : ''}
+        </div>
+    `;
+}
+
+    // Выход из системы
+    logoutBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        localStorage.removeItem('jwt');
+        window.location.href = '/';
+    });
+
+    // Вспомогательная функция для декодирования JWT
+    function parseJwt(token) {
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function formatDateTime(dateTimeStr) {
+        if (!dateTimeStr) return 'Неизвестная дата';
+
+        try {
+            const date = new Date(dateTimeStr);
+            return date.toLocaleString('ru-RU');
+        } catch (e) {
+            console.error('Error formatting date:', e);
+            return dateTimeStr;
+        }
+    }
+
+    // Преобразование типа рекомендации в читаемый формат
+    function getRecommendationTypeTitle(type) {
+        const types = {
+            'similar-games': 'Похожие игры',
+            'user-games': 'Персональные рекомендации игр',
+            'popular-games': 'Популярные игры',
+            'similar-movies': 'Похожие фильмы',
+            'user-movies': 'Персональные рекомендации фильмов'
+        };
+        return types[type] || type;
+    }
+
+    // Получаем кнопку очистки истории
+const clearHistoryBtn = document.getElementById('clear-history-btn');
+
+// Обработчик очистки истории
+clearHistoryBtn.addEventListener('click', function() {
+    if (!confirm('Вы уверены, что хотите очистить всю историю запросов? Это действие нельзя отменить.')) {
+        return;
+    }
+
+    loadingSpinner.style.display = 'block';
+
+    fetch('/api/history', {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (response.status === 403) {
+            throw new Error('Доступ запрещен');
+        }
+        if (!response.ok) {
+            throw new Error('Ошибка при очистке истории');
+        }
+        return response.json();
+    })
+    .then(data => {
+        alert(`История успешно очищена. Удалено записей: ${data.deletedCount}`);
+        // Обновляем историю на странице
+        historyContainer.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info">История запросов пуста</div>
+            </div>
+        `;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(`Ошибка при очистке истории: ${error.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.style.display = 'none';
+    });
+});
+
+// Открытие модального окна
+document.getElementById('add-content-btn').addEventListener('click', function() {
+    new bootstrap.Modal(document.getElementById('addContentModal')).show();
+});
+
+// Отправка формы фильма
+// Отправка формы фильма
+document.getElementById('submit-movie-btn').addEventListener('click', function() {
+    const formData = new FormData(document.getElementById('add-movie-form'));
+    const movieData = {
+        title: formData.get('title'),
+        originalTitle: formData.get('originalTitle'),
+        overview: formData.get('overview'),
+        tagline: formData.get('tagline'),
+        homepage: formData.get('homepage'),
+        originalLanguage: formData.get('originalLanguage'),
+        releaseDate: formData.get('releaseDate') ? new Date(formData.get('releaseDate')).toISOString() : null,
+        popularity: formData.get('popularity') ? parseFloat(formData.get('popularity')) : null,
+        budget: formData.get('budget') ? parseInt(formData.get('budget')) : null,
+        revenue: formData.get('revenue') ? parseInt(formData.get('revenue')) : null,
+        runtime: formData.get('runtime') ? parseInt(formData.get('runtime')) : null,
+        voteAverage: formData.get('voteAverage') ? parseFloat(formData.get('voteAverage')) : null,
+        voteCount: formData.get('voteCount') ? parseInt(formData.get('voteCount')) : null,
+        status: formData.get('status'),
+        genreIds: [] // Пока пустой - нужно будет добавить выбор жанров
+    };
+
+    fetch('/api/admin/content/movies', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(movieData)
+    })
+    .then(handleResponse)
+    .then(data => {
+        alert(`Фильм "${data.title}" успешно добавлен! ID: ${data.id}`);
+        bootstrap.Modal.getInstance(document.getElementById('addContentModal')).hide();
+    })
+    .catch(handleError);
+});
+
+// Отправка формы игры
+document.getElementById('submit-game-btn').addEventListener('click', function() {
+    const formData = new FormData(document.getElementById('add-game-form'));
+
+    const gameData = {
+        name: formData.get('name'),
+        releaseDate: formData.get('releaseDate') ? new Date(formData.get('releaseDate')).toISOString() : null,
+        english: formData.get('english') === 'true',
+        developer: formData.get('developer'),
+        publisher: formData.get('publisher'),
+        requiredAge: formData.get('requiredAge') ? parseInt(formData.get('requiredAge')) : null,
+        achievements: formData.get('achievements') ? parseInt(formData.get('achievements')) : null,
+        positiveRatings: formData.get('positiveRatings') ? parseInt(formData.get('positiveRatings')) : null,
+        negativeRatings: formData.get('negativeRatings') ? parseInt(formData.get('negativeRatings')) : null,
+        averagePlaytime: formData.get('averagePlaytime') ? parseInt(formData.get('averagePlaytime')) : null,
+        medianPlaytime: formData.get('medianPlaytime') ? parseInt(formData.get('medianPlaytime')) : null,
+        owners: formData.get('owners'),
+        price: formData.get('price') ? parseFloat(formData.get('price')) : null,
+        platforms: formData.get('platforms') ?
+            formData.get('platforms').split(',').map(p => p.trim()).filter(p => p) : [],
+        categories: formData.get('categories') ?
+            formData.get('categories').split(',').map(c => c.trim()).filter(c => c) : [],
+        genres: formData.get('genres') ?
+            formData.get('genres').split(',').map(g => g.trim()).filter(g => g) : [],
+        tags: formData.get('tags') ?
+            formData.get('tags').split(',').map(t => t.trim()).filter(t => t) : []
+    };
+
+    fetch('/api/admin/content/games', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(gameData)
+    })
+    .then(handleResponse)
+    .then(data => {
+        alert(`Игра "${data.name}" успешно добавлена! ID: ${data.id}`);
+        bootstrap.Modal.getInstance(document.getElementById('addContentModal')).hide();
+    })
+    .catch(handleError);
+});
+
+// Обработчик ответов
+function handleResponse(response) {
+    if (!response.ok) {
+        return response.json().then(err => Promise.reject(err));
+    }
+    return response.json();
+}
+
+// Обработчик ошибок
+function handleError(error) {
+    console.error('Ошибка:', error);
+    let message = error.message || 'Неизвестная ошибка';
+    if (error.details) {
+        message += '\nДетали: ' + error.details.join('\n');
+    }
+    alert(`Ошибка: ${message}`);
+}
+
+// Удаление фильма
+document.getElementById('confirm-delete-movie').addEventListener('click', function() {
+    const movieId = document.getElementById('delete-movie-id').value;
+    const movieTitle = document.getElementById('delete-movie-title').value;
+
+    if (!movieId) {
+        alert('Выберите фильм для удаления');
+        return;
+    }
+
+    if (!confirm(`Вы уверены, что хотите удалить фильм "${movieTitle}" (ID: ${movieId})? Это действие нельзя отменить.`)) {
+        return;
+    }
+
+    fetch(`/api/admin/content/movies/${movieId}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (response.status === 204) {
+            alert(`Фильм "${movieTitle}" успешно удален!`);
+            // Очищаем поля
+            document.getElementById('delete-movie-id').value = '';
+            document.getElementById('delete-movie-title').value = '';
+            // Очищаем результаты поиска
+            document.getElementById('movie-search-results').innerHTML = '';
+            document.getElementById('search-movie').value = '';
+        } else if (response.status === 404) {
+            alert('Фильм не найден');
+        } else {
+            throw new Error('Ошибка удаления фильма');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(`Ошибка при удалении фильма: ${error.message}`);
+    });
+});
+
+// Удаление игры
+document.getElementById('confirm-delete-game').addEventListener('click', function() {
+    const gameId = document.getElementById('delete-game-id').value;
+    const gameTitle = document.getElementById('delete-game-title').value;
+
+    if (!gameId) {
+        alert('Выберите игру для удаления');
+        return;
+    }
+
+    if (!confirm(`Вы уверены, что хотите удалить игру "${gameTitle}" (ID: ${gameId})? Это действие нельзя отменить.`)) {
+        return;
+    }
+
+    fetch(`/api/admin/content/games/${gameId}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        if (response.status === 204) {
+            alert(`Игра "${gameTitle}" успешно удалена!`);
+            // Очищаем поля
+            document.getElementById('delete-game-id').value = '';
+            document.getElementById('delete-game-title').value = '';
+            // Очищаем результаты поиска
+            document.getElementById('game-search-results').innerHTML = '';
+            document.getElementById('search-game').value = '';
+        } else if (response.status === 404) {
+            alert('Игра не найдена');
+        } else {
+            throw new Error('Ошибка удаления игры');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(`Ошибка при удалении игры: ${error.message}`);
+    });
+});
+
+// Поиск фильмов для удаления
+document.getElementById('search-movie-btn').addEventListener('click', function() {
+    const query = document.getElementById('search-movie').value.trim();
+    if (!query) {
+        alert('Введите поисковый запрос');
+        return;
+    }
+
+    fetch(`/api/movies/search?query=${encodeURIComponent(query)}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => response.json())
+    .then(movies => {
+        const resultsContainer = document.getElementById('movie-search-results');
+        resultsContainer.innerHTML = '';
+
+        if (movies.length === 0) {
+            resultsContainer.innerHTML = '<div class="list-group-item">Фильмы не найдены</div>';
+            return;
+        }
+
+        movies.forEach(movie => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">${movie.title}</h6>
+                        <small>ID: ${movie.id} | Дата выхода: ${movie.releaseDate || 'неизвестно'}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger select-movie-btn"
+                            data-id="${movie.id}"
+                            data-title="${movie.title}">
+                        Выбрать
+                    </button>
+                </div>
+            `;
+            resultsContainer.appendChild(item);
+        });
+
+        // Добавляем обработчики для кнопок выбора
+        document.querySelectorAll('.select-movie-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                document.getElementById('delete-movie-id').value = this.dataset.id;
+                document.getElementById('delete-movie-title').value = this.dataset.title;
+            });
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при поиске фильмов');
+    });
+});
+
+// Поиск игр для удаления
+document.getElementById('search-game-btn').addEventListener('click', function() {
+    const query = document.getElementById('search-game').value.trim();
+    if (!query) {
+        alert('Введите поисковый запрос');
+        return;
+    }
+
+    fetch(`/api/games/search?query=${encodeURIComponent(query)}`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => response.json())
+    .then(games => {
+        const resultsContainer = document.getElementById('game-search-results');
+        resultsContainer.innerHTML = '';
+
+        if (games.length === 0) {
+            resultsContainer.innerHTML = '<div class="list-group-item">Игры не найдены</div>';
+            return;
+        }
+
+        games.forEach(game => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">${game.name}</h6>
+                        <small>ID: ${game.id} | Разработчик: ${game.developer || 'неизвестно'}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger select-game-btn"
+                            data-id="${game.id}"
+                            data-title="${game.name}">
+                        Выбрать
+                    </button>
+                </div>
+            `;
+            resultsContainer.appendChild(item);
+        });
+
+        // Добавляем обработчики для кнопок выбора
+        document.querySelectorAll('.select-game-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                document.getElementById('delete-game-id').value = this.dataset.id;
+                document.getElementById('delete-game-title').value = this.dataset.title;
+            });
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при поиске игр');
+    });
+});
+
+// Для фильмов
+item.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h6 class="mb-0">${movie.title}</h6>
+            <small class="text-muted">
+                ID: ${movie.id} |
+                Рейтинг: ${movie.voteAverage || '?'}/10 |
+                ${movie.releaseDate || 'Дата неизвестна'}
+            </small>
+        </div>
+        <button class="btn btn-sm btn-outline-danger select-movie-btn"
+                data-id="${movie.id}"
+                data-title="${movie.title}">
+            Выбрать
+        </button>
+    </div>
+`;
+
+// Для игр
+item.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h6 class="mb-0">${game.name}</h6>
+            <small class="text-muted">
+                ID: ${game.id} |
+                Разработчик: ${game.developer || 'неизвестно'} |
+                Цена: $${game.price || '0'}
+            </small>
+        </div>
+        <button class="btn btn-sm btn-outline-danger select-game-btn"
+                data-id="${game.id}"
+                data-title="${game.name}">
+            Выбрать
+        </button>
+    </div>
+`;
+</script>
+</body>
+</html>

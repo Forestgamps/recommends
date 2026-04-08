@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Подбор фильмов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+
+            background-image: url([[@{/images/rename.jpg}]]);
+              background-size: cover;
+              background-position: center;
+              background-repeat: no-repeat;
+              background-attachment: fixed; /* Фиксирует фон при прокрутке (опционально) */
+              min-height: 100vh; /* Занимает всю высоту экрана */
+        }
+        #search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        #search-input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #suggestions {
+            position: absolute;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            z-index: 1000;
+            display: none;
+        }
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #f5f5f5;
+        }
+        #selected-movies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .selected-movie {
+            background: #f0f0f0;
+            padding: 8px 12px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .remove-movie {
+            margin-left: 8px;
+            cursor: pointer;
+            color: #999;
+        }
+        #recommend-btn {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #recommend-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 30px;
+        }
+        .movie-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+<h1>Подбор фильмов</h1>
+
+<div id="search-container">
+    <input type="text" id="search-input" placeholder="Начните вводить название фильма...">
+    <div id="suggestions"></div>
+</div>
+
+<div id="selected-movies"></div>
+
+<button id="recommend-btn" disabled>Подобрать рекомендации</button>
+
+<div id="results"></div>
+
+<script>
+        const searchInput = document.getElementById('search-input');
+        const suggestions = document.getElementById('suggestions');
+        const selectedMoviesContainer = document.getElementById('selected-movies');
+        const recommendBtn = document.getElementById('recommend-btn');
+        const resultsContainer = document.getElementById('results');
+
+        let selectedMovies = [];
+        let searchTimeout = null;
+
+        // Поиск фильмов при вводе
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+
+            if (query.length < 2) {
+                suggestions.style.display = 'none';
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/movies/search?query=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(movies => {
+                        if (movies.length > 0) {
+                            showSuggestions(movies);
+                        } else {
+                            suggestions.style.display = 'none';
+                        }
+                    });
+            }, 300);
+        });
+
+        // Показ подсказок
+        function showSuggestions(movies) {
+            suggestions.innerHTML = '';
+
+            movies.forEach(movie => {
+                // Пропускаем уже выбранные фильмы
+                if (selectedMovies.some(m => m.id === movie.id)) return;
+
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.textContent = `${movie.title} (${movie.releaseDate ? movie.releaseDate.substring(0, 4) : '?'})`;
+
+                div.addEventListener('click', () => {
+                    addSelectedMovie(movie);
+                    searchInput.value = '';
+                    suggestions.style.display = 'none';
+                });
+
+                suggestions.appendChild(div);
+            });
+
+            suggestions.style.display = 'block';
+        }
+
+        // Добавление выбранного фильма
+        function addSelectedMovie(movie) {
+            if (selectedMovies.some(m => m.id === movie.id)) return;
+
+            selectedMovies.push(movie);
+            updateSelectedMoviesList();
+            recommendBtn.disabled = selectedMovies.length === 0;
+        }
+
+        // Обновление списка выбранных фильмов
+        function updateSelectedMoviesList() {
+            selectedMoviesContainer.innerHTML = '';
+
+            selectedMovies.forEach(movie => {
+                const div = document.createElement('div');
+                div.className = 'selected-movie';
+
+                const span = document.createElement('span');
+                span.textContent = movie.title;
+
+                const removeBtn = document.createElement('span');
+                removeBtn.className = 'remove-movie';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.addEventListener('click', () => {
+                    selectedMovies = selectedMovies.filter(m => m.id !== movie.id);
+                    updateSelectedMoviesList();
+                    recommendBtn.disabled = selectedMovies.length === 0;
+                });
+
+                div.appendChild(span);
+                div.appendChild(removeBtn);
+                selectedMoviesContainer.appendChild(div);
+            });
+        }
+
+        // Получение рекомендаций
+        recommendBtn.addEventListener('click', function() {
+            const movieIds = selectedMovies.map(movie => movie.id);
+
+            fetch(`/api/recommendations/multi?movieIds=${movieIds.join('&movieIds=')}`)
+                .then(response => response.json())
+                .then(recommendations => {
+                    showRecommendations(recommendations);
+                });
+        });
+
+        // Отображение результатов
+        function showRecommendations(movies) {
+            resultsContainer.innerHTML = '';
+
+            if (movies.length === 0) {
+                resultsContainer.innerHTML = '<p>Не найдено рекомендаций. Попробуйте выбрать другие фильмы.</p>';
+                return;
+            }
+
+            movies.forEach(movie => {
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+
+                const title = document.createElement('h3');
+                title.textContent = movie.title;
+                const year = document.createElement('p');
+                year.textContent = movie.releaseDate ? movie.releaseDate.substring(0, 4) : 'Год неизвестен';
+
+                const overview = document.createElement('p');
+                overview.textContent = movie.desc || 'Описание отсутствует';
+
+                card.appendChild(title);
+                card.appendChild(year);
+                card.appendChild(overview);
+                resultsContainer.appendChild(card);
+            });
+        }
+
+        // Скрытие подсказок при клике вне поля
+        document.addEventListener('click', function(e) {
+            if (e.target !== searchInput) {
+                suggestions.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
